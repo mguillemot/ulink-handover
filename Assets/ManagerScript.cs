@@ -17,13 +17,26 @@ public class ManagerScript : uLink.MonoBehaviour
 
     void Start()
     {
+        // Auto-start server?
         var serverPort = ApplicationUtils.GetCommandlineIntParameter("-server");
         if (serverPort.HasValue)
         {
             uLink.Network.InitializeServer(32, serverPort.Value);
         }
+    }
 
-        InvokeRepeating("PeriodicUpdate", 1, 1);
+    void RegisterCodecs(bool order)
+    {
+        if (order)
+        {
+            uLink.BitStreamCodec.AddAndMakeArray<PlayerData>(PlayerData.Read, PlayerData.Write);
+            uLink.BitStreamCodec.AddAndMakeArray<TestData>(TestData.Read, TestData.Write);
+        }
+        else
+        {
+            uLink.BitStreamCodec.AddAndMakeArray<TestData>(TestData.Read, TestData.Write);
+            uLink.BitStreamCodec.AddAndMakeArray<PlayerData>(PlayerData.Read, PlayerData.Write);
+        }
     }
 
     void OnGUI()
@@ -33,18 +46,22 @@ public class ManagerScript : uLink.MonoBehaviour
         {
             if (GUILayout.Button("Start server 7000"))
             {
+                RegisterCodecs(true);
                 uLink.Network.InitializeServer(32, 7000);
             }
             if (GUILayout.Button("Start server 7001"))
             {
+                RegisterCodecs(false);
                 uLink.Network.InitializeServer(32, 7001);
             }
             if (GUILayout.Button("Start server 7002"))
             {
+                RegisterCodecs(true);
                 uLink.Network.InitializeServer(32, 7002);
             }
             if (GUILayout.Button("Start client"))
             {
+                RegisterCodecs(true);
                 uLink.Network.Connect("127.0.0.1", 7000);
             }
         }
@@ -87,18 +104,6 @@ public class ManagerScript : uLink.MonoBehaviour
         GUILayout.EndArea();
     }
 
-    void PeriodicUpdate()
-    {
-        //if (isClient)
-        //{
-        //    var me = FindObjectOfType(typeof(Player)) as Player;
-        //    if (me != null)
-        //    {
-        //        me.networkView.RPC("RequestMove", uLink.RPCMode.Server);
-        //    }
-        //}
-    }
-
     #region Server
 
     void uLink_OnServerInitialized()
@@ -116,7 +121,7 @@ public class ManagerScript : uLink.MonoBehaviour
             p2pConnector.port = i;
         }
 
-        emulateBadConditions = true;
+        //emulateBadConditions = true;
     }
 
     private bool emulateBadConditions
@@ -144,7 +149,8 @@ public class ManagerScript : uLink.MonoBehaviour
         }
     }
 
-    private PlayerData approvedData;
+    private PlayerData approvedPlayerData;
+    private TestData approvedTestData;
 
     void uLink_OnPlayerApproval(uLink.NetworkPlayerApproval approval)
     {
@@ -157,21 +163,31 @@ public class ManagerScript : uLink.MonoBehaviour
                 Debug.LogError("!!!!!!!!!!!!!!!!!!!! THIS IS THE BUG !!!!!!!!!!!!!!!!!!!!!");
             }
 
-            approvedData = approval.handoverData.Read<PlayerData>();
-            Debug.LogError("Handover data was " + approvedData);
+            approvedPlayerData = approval.handoverData.Read<PlayerData>();
+            approvedTestData = approval.handoverData.Read<TestData>();
+            if (approvedPlayerData.stuff.Length != 1234)
+            {
+                Debug.LogError("!!!!!!!!!!!!!!!!!!!! THIS IS ANOTHER BUG !!!!!!!!!!!!!!!!!!!!!");
+            }
         }
         else
         {
-            approvedData = new PlayerData
-                               {
-                                   name = "Player " + Random.Range(1, 1000000),
-                                   stuff = new float[1234]
-                               };
-            for (int i = 0; i < approvedData.stuff.Length; i++)
+            approvedPlayerData = new PlayerData
+                                     {
+                                         name = "Player " + Random.Range(1, 1000000),
+                                         stuff = new float[1234]
+                                     };
+            for (int i = 0; i < approvedPlayerData.stuff.Length; i++)
             {
-                approvedData.stuff[i] = Random.value;
+                approvedPlayerData.stuff[i] = Random.value;
             }
-            Debug.LogError("New connection from " + approval + ", generating PlayerData " + approvedData);
+            approvedTestData = new TestData
+                                   {
+                                       a = Random.Range(1, int.MaxValue),
+                                       b = Random.Range(1, int.MaxValue),
+                                       c = (ushort) Random.Range(1, 1000)
+                                   };
+            Debug.LogError("New connection from " + approval + ", generating PlayerData " + approvedPlayerData);
         }
 
         approval.Approve();
@@ -183,8 +199,10 @@ public class ManagerScript : uLink.MonoBehaviour
 
         var pos = Random.insideUnitSphere * 1000;
         var playerObject = uLink.Network.Instantiate(player, PlayerPrefab, pos, Quaternion.identity, 0);
-        playerObject.GetComponent<Player>().data = approvedData;
-        approvedData = null;
+        playerObject.GetComponent<Player>().data = approvedPlayerData;
+        playerObject.GetComponent<Player>().test = approvedTestData;
+        approvedPlayerData = null;
+        approvedTestData = null;
     }
 
     void uLink_OnPlayerDisconnected(uLink.NetworkPlayer player)

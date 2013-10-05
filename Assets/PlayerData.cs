@@ -13,7 +13,7 @@ public class PlayerData
         return string.Format("[PlayerData name={0} stuff={1}]", name, stuff.Length);
     }
 
-    static void Write(uLink.BitStream stream, object value, params object[] codecOptions)
+    public static void Write(uLink.BitStream stream, object value, params object[] codecOptions)
     {
         var data = (PlayerData)value;
         stream.Write(data.name);
@@ -24,7 +24,7 @@ public class PlayerData
         }
     }
 
-    static object Read(uLink.BitStream stream, params object[] codecOptions)
+    public static object Read(uLink.BitStream stream, params object[] codecOptions)
     {
         var data = new PlayerData();
         data.name = stream.Read<string>();
@@ -34,11 +34,6 @@ public class PlayerData
             data.stuff[i] = stream.Read<float>();
         }
         return data;
-    }
-
-    static PlayerData()
-    {
-        uLink.BitStreamCodec.AddAndMakeArray<PlayerData>(Read, Write);
     }
 
 }

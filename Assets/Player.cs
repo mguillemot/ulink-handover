@@ -5,6 +5,7 @@ public class Player : uLink.MonoBehaviour
 {
 
     public PlayerData data { get; set; }
+    public TestData test { get; set; }
 
     void uLink_OnNetworkInstantiate(uLink.NetworkMessageInfo info)
     {
